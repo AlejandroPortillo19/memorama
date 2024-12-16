@@ -23,6 +23,8 @@ IM: call setinicio
 CM: cmp FIN, 1
     je FMG
     call ingresarSeleccion
+    cmp FIN, 1
+    je FMG
     call compararSeleccion
     call verificarFin
     cmp vidas, 0
@@ -64,13 +66,33 @@ ingresarSeleccion proc near
     mov dx, offset MSG_SELECCION
     call mostrarmsg
     call ingresar
+    sub al, '0'          ; Convertir carácter a número
+    cmp al, 0
+    jb INVALIDO
+    cmp al, MAX_CARTAS - 1
+    ja INVALIDO
     mov SELECCION1, al
+    jmp SELECCION_VALIDA
 
+INVALIDO:
+    mov FIN, 1           ; Terminar el juego si la entrada es inválida
+    ret
+
+SELECCION_VALIDA:
     ; Ingresar segunda seleccion
     mov dx, offset MSG_SELECCION
     call mostrarmsg
     call ingresar
+    sub al, '0'          ; Convertir carácter a número
+    cmp al, 0
+    jb INVALIDO2
+    cmp al, MAX_CARTAS - 1
+    ja INVALIDO2
     mov SELECCION2, al
+    ret
+
+INVALIDO2:
+    mov FIN, 1           ; Terminar el juego si la entrada es inválida
     ret
 ingresarSeleccion endp
 
@@ -79,25 +101,21 @@ compararSeleccion proc near
     mov al, SELECCION1
     mov bl, SELECCION2
     cmp al, bl
+    je NO_PAR          ; Si las selecciones son iguales, no es un par válido
+
+    ; Obtener cartas seleccionadas
+    mov si, offset CARTAS
+    mov dl, [si + SELECCION1]
+    mov dh, [si + SELECCION2]
+    cmp dl, dh
     jne NO_PAR
 
     ; Si son par, mostrar cartas
     mov si, offset MOSTRAR_CARTAS
-    mov cx, MAX_CARTAS
-CS_LOOP: push cx
-         cmp [si], al
-         je CS_MOSTRAR
-         inc si
-         pop cx
-         loop CS_LOOP
-         jmp CS_CONT
-
-CS_MOSTRAR: mov [si], al
-            inc ENCONTRADAS
-            pop cx
-            loop CS_LOOP
-
-CS_CONT: jmp FIN_COMPARAR
+    mov [si + SELECCION1], dl
+    mov [si + SELECCION2], dh
+    inc ENCONTRADAS
+    jmp FIN_COMPARAR
 
 NO_PAR: call quitarvida
 
@@ -105,7 +123,7 @@ FIN_COMPARAR: ret
 compararSeleccion endp
 
 verificarFin proc near
-    cmp ENCONTRADAS, MAX_CARTAS
+    cmp ENCONTRADAS, MAX_CARTAS / 2
     je JUEGO_TERMINADO
     ret
 
@@ -132,6 +150,7 @@ MSG_GANO db "Felicitaciones, has ganado!$", 13, 10, "$"
 MSG_PERDIO db "Perdiste, intente de nuevo.$", 13, 10, "$"
 MSG_OCULTA db "Ingresa una palabra que no tenga numeros o caracteres especial y presiona enter.", 13, 10, "$"
 MSG_ADIVINE db "Adivina la palabra!", 13, 10, "$"
+MSG_INVALIDO db "Juego finalizado: La palabra contenia numeros o caracteres no validos.", 13, 10, "$"
 MSG_VIDAS db "Vidas restantes: ", "$"
 MAX_LARGO equ 10 ; Ajusta el valor según sea necesario
 SECRETA db MAX_LARGO+1 dup ('$')
@@ -162,11 +181,15 @@ IC: mov ah, 07h
     je FI
     call convertir_a_mayuscula
     cmp al, 'A'
+    jb INVALIDO
     cmp al, 'Z'
+    ja INVALIDO
     mov [di], al
     inc di
     inc ch
     jmp IC
+INVALIDO:
+    call finalizar
 FI: inc di
     mov [di], '$'
     mov LARGO_PALABRA, ch
@@ -289,7 +312,7 @@ mostrarvidas proc near
     push ax
     push dx
     push cx
-    mov al, VIDAS
+    mov al, vidas
     add al, '0'
     mov ah, 02h
     mov dl, al
@@ -305,8 +328,10 @@ mostrarvidas proc near
 mostrarvidas endp
 
 quitarvida proc near
-    sub VIDAS, 1
+    dec vidas
     call mostrarvidas
+    cmp vidas, 0
+    je FMP
     ret
 quitarvida endp
 
@@ -350,3 +375,19 @@ saltarlinea proc near
     call setcursor
     ret
 saltarlinea endp
+
+finalizar proc near
+    add FILA, 2
+    call setcursor
+    mov dx, offset MSG_INVALIDO
+    call mostrarmsg
+    mov ah, 4Ch
+    int 21h
+    ret
+finalizar endp
+
+; Aquí incluirías las subrutinas de mostrarmsg, ingresar, setinicio, etc.
+
+; Subrutina para mostrar un mensaje
+
+; Subrutina para ingresar un caracter
